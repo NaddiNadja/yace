@@ -12,14 +12,20 @@ What is produced:
 
   * This is an expansion of the :ctypes:`Python/ctypes <>` module
 
-* C API Wrapper (``{meta.prefix}.py``)
+* Utility (``util.py``)
 
-  * Python module mapping the :ref:`sec-ir` to :class:`yace.target.ctypes`
-  * :ref:`sec-ir-constants` become global variables in the ``{prefix}`` module,
-    such as ``{prefix}.MIN_X``.
-  * EnumTypes  mapped to :class:`yace.targets.ctypes.ctypes_sugar.Enum`
-  * :ref:`sec-ir-structtypes` mapped to :class:`yace.targets.ctypes.ctypes_sugar.Structure`
-  * :ref:`sec-ir-uniontypes` mapped to :class:`yace.targets.ctypes.ctypes_sugar.Union`
+  * Loading libraries using the :ctypes:`Python/ctypes <>` module
+  * Architecture check, which ensures that the target architecture matches the
+    architecture, the bindings were built on.
+
+* Initialiser (``__init__.py``)
+
+  * Necessary files for initialising the Python module.
+
+* ``raw`` API containing the full :ctypes:`ctypes <>` API.
+
+  * C typing is not abstracted away, and the user must cast Python objects 
+    to :ctypes:`ctypes <>` objects themselves.
 
 * Test (``{meta.prefix}_check.py``)
 
