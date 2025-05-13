@@ -13,7 +13,7 @@ from yace.emitters import Emitter
 from yace.errors import TransformationError
 from yace.targets.target import Target
 from yace.tools import Black, Isort, Python3
-from yace.transformations import Camelizer
+from yace.transformations import Camelizer, Modulizer
 
 
 class Ctypes(Target):
@@ -44,6 +44,13 @@ class Ctypes(Target):
         """
 
         transformed = copy.deepcopy(model)
+
+        walker = Modulizer(transformed)
+        status = walker.walk()
+        if not all([res for res in status]):
+            raise TransformationError("The transformation to Python modules failed")
+        self.modules = walker.modules
+        self.module_imports = walker.module_imports
 
         status = Camelizer(transformed).walk()
         if not all([res for res in status]):
