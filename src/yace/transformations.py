@@ -71,6 +71,8 @@ class Camelizer(ModelWalker):
     described above is not performed.
     """
 
+    disallowed_syms = []
+
     def visit(self, current, ancestors, depth):
         if "sym" not in list(current.model_dump().keys()):
             return (True, None)
@@ -82,6 +84,9 @@ class Camelizer(ModelWalker):
             current.sym = camelcase(current.sym)
         elif current.key in ["enum_value"]:
             current.sym = current.sym.upper()
+
+        if current.sym in self.disallowed_syms:
+            current.sym += "_"
 
         return (True, None)
 

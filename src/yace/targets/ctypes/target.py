@@ -22,6 +22,42 @@ class Ctypes(Target):
     """
 
     NAME = "ctypes"
+    PYTHON_KEYWORDS = [
+        "and",
+        "as",
+        "assert",
+        "async",
+        "break",
+        "class",
+        "continue",
+        "def",
+        "del",
+        "elif",
+        "else",
+        "except",
+        "False",
+        "finally",
+        "for",
+        "from",
+        "global",
+        "if",
+        "import",
+        "in",
+        "is",
+        "lambda",
+        "None",
+        "nonlocal",
+        "not",
+        "or",
+        "pass",
+        "raise",
+        "return",
+        "True",
+        "try",
+        "while",
+        "with",
+        "yield",
+    ]
 
     def __init__(self, output):
         super().__init__(Ctypes.NAME, output)
@@ -52,7 +88,9 @@ class Ctypes(Target):
         self.modules = walker.modules
         self.module_imports = walker.module_imports
 
-        status = Camelizer(transformed).walk()
+        walker = Camelizer(transformed)
+        walker.disallowed_syms = self.PYTHON_KEYWORDS
+        status = walker.walk()
         if not all([res for res in status]):
             raise TransformationError("The CStyle transformation failed")
 
