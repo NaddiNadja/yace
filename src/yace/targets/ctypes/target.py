@@ -13,7 +13,7 @@ from yace.emitters import Emitter
 from yace.errors import TransformationError
 from yace.targets.target import Target
 from yace.tools import Black, Isort, Python3
-from yace.transformations import Camelizer, Modulizer
+from yace.transformations import Camelizer, DependencyWalker, Modulizer
 
 
 class Ctypes(Target):
@@ -87,6 +87,12 @@ class Ctypes(Target):
             raise TransformationError("The transformation to Python modules failed")
         self.modules = walker.modules
         self.module_imports = walker.module_imports
+
+        walker = DependencyWalker(transformed)
+        status = walker.walk()
+        if not all([res for res in status]):
+            raise TransformationError("The transformation to Python modules failed")
+        walker.topological_sort()
 
         walker = Camelizer(transformed)
         walker.disallowed_syms = self.PYTHON_KEYWORDS

@@ -19,6 +19,7 @@ from collections import defaultdict
 from typing import Dict, List
 
 from yace.emitters import camelcase
+from yace.errors import TransformationError
 from yace.ir.base import Entity
 from yace.ir.derivedtypes import Struct, Union
 from yace.model import ModelWalker
@@ -139,6 +140,80 @@ class Modulizer(ModelWalker):
                     self.module_imports[top_module][module].append(current)
 
         return (True, None)
+
+
+class DependencyWalker(ModelWalker):
+    """
+    Creates a dependency graph of the model entities, where an edge between
+    two entities (A, B) means that entity A depends on entity B.
+    """
+
+    dependencies: Dict[str, List[str]] = defaultdict(list)
+
+    def visit(self, current, ancestors, depth):
+        if "sym" not in list(current.model_dump().keys()):
+            return (True, None)
+
+        if not current.sym:
+            return (True, None)
+
+        if current.key in ["enum_value"]:
+            return (True, None)
+
+        prefix = self.model.meta.prefix
+
+        has_prefix = current.sym.lower().startswith(prefix + "_")
+        if not has_prefix:
+            return (True, None)
+
+        [
+            self.dependencies[ancestor.sym].append(current.sym)
+            for ancestor in ancestors
+            if ancestor in self.model.entities
+        ]
+
+        return (True, None)
+
+    def topological_sort(self):
+        """Sort the model entities based on the dependency graph such that for any
+        entity A depending on entity B, entity B will occur before A in the list of
+        entities.
+
+        Raises a TransformationError if the dependency graph is not acyclic, meaning
+        there are cyclic dependencis in the model.
+
+        Topological sorting is non-deterministic.
+        """
+
+        degree = {e.sym: 0 for e in self.model.entities if getattr(e, "sym", None)}
+
+        for _, adj_list in self.dependencies.items():
+            vertices = [v for v in adj_list if v in degree]
+            for v in vertices:
+                degree[v] += 1
+
+        roots = [v for v, degree in degree.items() if degree == 0]
+
+        topological_order = []
+        while roots:
+            current = roots.pop()
+            topological_order.append(current)
+            del degree[current]
+
+            vertices = [v for v in self.dependencies[current] if v in degree]
+            for v in vertices:
+                degree[v] -= 1
+                if degree[v] == 0:
+                    roots.append(v)
+
+        if len(degree):
+            raise TransformationError(
+                "Could not determine order of entities, cyclic dependencies."
+            )
+
+        self.model.entities.sort(
+            key=lambda e: topological_order.index(e.sym), reverse=True
+        )
 
 
 class HoistAnonMembers(ModelWalker):
