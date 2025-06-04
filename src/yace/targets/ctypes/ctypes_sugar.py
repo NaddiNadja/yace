@@ -1,11 +1,6 @@
 """
 Addition to ctypes, making it slightly nicer to use, including:
 
-* gen_search_paths(libname)
-  * find_library() + pkg-config
-
-* load(libname)
-
 * typedef additions
   * c_log_double_t
   * c_uint128
@@ -22,28 +17,18 @@ SPDX-License-Identifier: BSD-3-Clause
 """
 
 import ctypes
-import ctypes.util
-import os
-import platform
-import subprocess
-
-SHARED_EXT = {
-    "linux": "so",
-    "windows": "dll",
-    "darwin": "dylib",
-}
+from typing import TypeAlias
 
 c_int128 = ctypes.c_ubyte * 16
 c_uint128 = c_int128
-void = None
-if ctypes.sizeof(ctypes.c_longdouble) == 8:
-    c_long_double_t = ctypes.c_longdouble
-else:
-    c_long_double_t = ctypes.c_ubyte * 8
+void: TypeAlias = None
 
 
 class Enum(object):
     """Encapsulation of C enum"""
+
+    def from_param(self):
+        return ctypes.c_int
 
     pass
 
@@ -60,42 +45,27 @@ class Union(ctypes.Union):
     pass
 
 
-def gen_search_paths(libname):
-    """
-    Yields search-paths for the shared library with the given 'libname'. It is
-    an extension of ``ctypes.util.find_library()`` using ``pkg-config``.
-    """
+def char_p_to_str(char_pointer, encoding="utf-8", errors="strict"):
+    """Cast a C char pointer to a Python string."""
 
-    path = ctypes.util.find_library(libname)
-    if path:
-        yield path
+    value = ctypes.cast(char_pointer, ctypes.c_char_p).value
 
-    try:
-        proc = subprocess.run(
-            ["pkg-config", libname, "--variable=libdir"],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        if not proc.returncode:
-            ext = SHARED_EXT.get(platform.system().lower(), "so")
+    if value is not None and encoding is not None:
+        value = value.decode(encoding, errors=errors)
 
-            yield os.path.join(
-                proc.stdout.decode("utf-8").strip(), f"lib{libname}.{ext}"
-            )
-    except subprocess.CalledProcessError:
-        pass
+    return value
 
 
-def load(libname):
-    """Dynamically load the shared library named 'libname'"""
+def str_to_char_p(string, encoding="utf-8"):
+    """Cast a Python string to a C char pointer."""
 
-    for spath in gen_search_paths(libname):
+    if encoding is not None:
         try:
-            lib = ctypes.CDLL(spath)
-            if lib:
-                return lib
-        except OSError:
-            continue
+            string = string.encode(encoding)
+        except AttributeError:
+            # In Python3, bytes has no encode attribute
+            pass
 
-    return None
+    string = ctypes.c_char_p(string)
+
+    return ctypes.cast(string, ctypes.POINTER(ctypes.c_char))
