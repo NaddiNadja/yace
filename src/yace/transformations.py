@@ -73,21 +73,36 @@ class Camelizer(ModelWalker):
     """
 
     disallowed_syms = []
+    sym_mapping: Dict[str, str] = dict()
 
     def visit(self, current, ancestors, depth):
         if "sym" not in list(current.model_dump().keys()):
             return (True, None)
 
+        sym = current.sym
+
+        if sym in self.model.sym_mapping:
+            sym = self.model.sym_mapping[sym]
+
         if current.key in ["define"]:
-            current.sym = current.sym.upper()
-        elif current.key in ["enum", "struct", "union"]:
-            current.sym = "_".join([current.sym, current.key])
-            current.sym = camelcase(current.sym)
+            sym = sym.upper()
+        elif current.key in ["enum", "struct_decl", "union_decl"]:
+            sym = "_".join([sym, current.key.replace("_decl", "")])
+            sym = camelcase(sym)
+        elif current.key in ["function_pointer_decl"]:
+            sym = "_".join([sym, "func"])
+            sym = camelcase(sym)
         elif current.key in ["enum_value"]:
-            current.sym = current.sym.upper()
+            sym = sym.upper()
 
         if current.sym in self.disallowed_syms:
             current.sym += "_"
+
+        if sym in self.disallowed_syms:
+            sym += "_"
+
+        if sym != current.sym:
+            self.model.sym_mapping[current.sym] = sym
 
         return (True, None)
 
@@ -131,6 +146,8 @@ class Modulizer(ModelWalker):
 
             if not ancestors:
                 self.modules[module].append(current)
+
+            self.model.sym_mapping[current.sym] = "_".join(parts) if parts else module
 
             if not part_of_module:
                 top_module = [a.module for a in ancestors if a.module][0]

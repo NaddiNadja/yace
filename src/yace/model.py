@@ -15,7 +15,7 @@ Their **Yace** Interface Definition Language representation follows below.
 import inspect
 import logging
 from pathlib import Path
-from typing import ClassVar, List, Union
+from typing import ClassVar, Dict, List, Union
 
 import yaml
 from pydantic import BaseModel, Field
@@ -76,6 +76,7 @@ class Model(BaseModel):
             directives.IncludeDirective,
         ]
     ] = Field(default_factory=list)
+    sym_mapping: Dict[str, str] = Field(default_factory=dict)
 
     @classmethod
     def entity_from_data(cls, cur: dict, parent=None, depth=0):
