@@ -115,14 +115,21 @@ class Ctypes(Target):
     def emit(self, model):
         """Emit code"""
 
+        def map_sym(sym: str):
+            return model.sym_mapping[sym] if sym in model.sym_mapping else sym
+
         filters = {
             "wrap": wrap,
             "sizeof": sizeof,
+            "map_sym": map_sym,
         }
 
         output = (self.output / model.meta.prefix).resolve()
         output.mkdir(parents=True, exist_ok=True)
 
+        lib_path = (output / "lib").resolve()
+        lib_path.mkdir(parents=True, exist_ok=True)
+        
         # Copy the generic ctypes-sugar from resources
         sugar_path = (output / "ctypes_sugar.py").resolve()
         shutil.copyfile(Path(__file__).parent / sugar_path.name, sugar_path)
@@ -131,8 +138,12 @@ class Ctypes(Target):
         # Generate raw bindings in raw.py
         def emit_typespec(typespec):
             return typespec.python_c_spelling()
+        
+        def emit_sym(entity):
+            return entity.typ.python_sym_spelling(model.sym_mapping.get(entity.sym, entity.sym))
 
         filters["emit_typespec"] = emit_typespec
+        filters["emit_sym"] = emit_sym
 
         raw_path = (output / "raw.py").resolve()
         with raw_path.open("w") as file:
@@ -143,11 +154,42 @@ class Ctypes(Target):
                         "meta": model.meta,
                         "entities": model.entities,
                         "headers": self.headers,
+                        "isRaw": True,
+                        "imports": {}
                     },
                     filters,
                 )
             )
         self.sources.append(raw_path)
+
+        def emit_typespec(typespec):
+            return typespec.python_spelling(model.sym_mapping)
+
+        filters["emit_typespec"] = emit_typespec
+
+
+        # Generate the pythonic bindings / Python API
+        for module, entities in self.modules.items():
+            module_path = (lib_path / f"{module}.py").resolve()
+            imports = self.module_imports[module]
+
+            with module_path.open("w") as file:
+                file.write(
+                    self.emitter.render(
+                        "file_api",
+                        {
+                            "meta": model.meta,
+                            "entities": entities,
+                            "headers": self.headers,
+                            "isRaw": False,
+                            "imports": imports,
+                            "module": module
+                        },
+                        filters,
+                    )
+                )
+            self.sources.append(module_path)
+        
 
         # Generate helper files
         files = [
@@ -168,6 +210,10 @@ class Ctypes(Target):
             with path.open("w") as file:
                 file.write(self.emitter.render(template, args, filters))
                 self.sources.append(path)
+        
+        with (lib_path / "__init__.py").open("w") as file:
+            file.write("")
+            self.sources.append((lib_path / "__init__.py"))
 
     def format(self):
         """

@@ -16,9 +16,20 @@ import ctypes
 from __future__ import annotations
 from typing import Any, Callable, TYPE_CHECKING
 
+{% if isRaw %}
 from {{ meta.prefix }} import clib as {{ meta.prefix }}_clib
+{% else %}
+import {{ meta.prefix }}.raw as raw
+{% endif %}
 from {{ meta.prefix }}.ctypes_sugar import Enum, Structure, Union, void
 
+{% if imports.items()|length %}if TYPE_CHECKING:{% endif %}
+{%- for imp, ents in imports.items() %}
+	from .{{ imp }} import {% for entity in ents -%}
+{{ entity.sym if isRaw else (entity.sym|map_sym) }}
+{{- "" if loop.last else ", " }}
+{%- endfor %}
+{% endfor %}
 
 {% for entity in entities if entity.key not in ["include_stmt"] %}
 {{ entity | emit_entity }}

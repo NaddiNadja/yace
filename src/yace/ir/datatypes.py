@@ -205,6 +205,108 @@ class Typespec(Entity):
 
         return ".".join(spelling)
 
+    def python_spelling(self, sym_mapping):
+        """Construct the Python spelling using Python typing."""
+
+        sym = self.sym
+
+        spelling = []
+
+        if sym_mapping and sym in sym_mapping:
+            sym = sym_mapping[sym]
+
+        if self.pointer and self.pointee:
+            pointee = self.pointee.python_spelling(sym_mapping)
+            if self.pointee.void:
+                spelling.append(f"Any")
+            elif "string" in self.key:
+                spelling.append(f"str")
+            else:
+                spelling.append(f"{pointee}")
+        elif self.pointer:
+            assert "function_pointer" in self.key
+            spelling.append(f"{sym}")
+        elif self.void:
+            spelling.append("void")
+        elif self.boolean:
+            spelling.append("bool")
+        elif self.character:
+            spelling.append("str")
+        elif self.size:
+            spelling.append("int")
+        elif self.integer:
+            spelling.append(f"int")
+        elif self.real:
+            spelling.append("float")
+        elif self.union:
+            spelling.append("Union")
+        elif self.struct:
+            spelling.append(f"{sym}")
+        elif self.enum:
+            spelling.append(f"{sym}")
+        elif self.array:
+            array_typ = self.array_typ.python_spelling(sym_mapping)
+            spelling.append(f"list[{array_typ}]")
+
+        return ".".join(spelling)
+
+    def python_sym_spelling(self, sym):
+        """
+        Construct casting from Python typing to ctypes typing.
+
+        This is used for the pythonic functions, when calling the ctypes functions.
+        """
+
+        spelling = []
+
+        if self.pointer and self.pointee:
+            pointee = self.pointee.python_sym_spelling(sym).split()[0]
+            if self.pointee.void:
+                spelling.append(f"ctypes.c_void_p({sym})")
+            elif "string" in self.key:
+                spelling.append(f"ctypes.c_char_p({sym}.encode(encoding='utf-8'))")
+            else:
+                spelling.append(f"ctypes.pointer({pointee})")
+            spelling.append(f"if {sym} else {sym}")
+        elif self.pointer:
+            assert "function_pointer" in self.key
+            spelling.append(f"raw.{self.sym}({sym})")
+        elif self.void:
+            spelling.append(f"{sym}")
+        elif self.boolean:
+            spelling.append(f"ctypes.c_bool({sym})")
+        elif self.character:
+            spelling.append(f"ctypes.c_byte({sym})" if self.signed else f"ctypes.c_ubyte({sym})")
+        elif self.size:
+            spelling.append(f"ctypes.c_ssize_t({sym})" if self.signed else f"ctypes.c_size_t({sym})")
+        elif self.integer and self.width_fixed:
+            spelling.append(f"ctypes.c_int{self.width}({sym})" if self.signed else f"ctypes.c_uint{self.width}({sym})")
+        elif self.integer:
+            if self.width <= IShort().width:
+                spelling.append(f"ctypes.c_short({sym})" if self.signed else f"ctypes.c_ushort({sym})")
+            elif self.width <= I().width:
+                spelling.append(f"ctypes.c_int({sym})" if self.signed else f"ctypes.c_uint({sym})")
+            elif self.width <= ILong().width:
+                spelling.append(f"ctypes.c_long({sym})" if self.signed else f"ctypes.c_ulong({sym})")
+            elif self.width <= ILongLong().width:
+                spelling.append(f"ctypes.c_longlong({sym})" if self.signed else f"ctypes.c_ulonglong({sym})")
+        elif self.real:
+            if self.width_fixed: 
+                spelling.append(f"ctypes.c_float({sym})")
+            else:
+                spelling.append(f"ctypes.c_double({sym})")
+        elif self.union:
+            spelling.append(f"{sym}")
+        elif self.struct:
+            spelling.append(f"{sym}")
+        elif self.enum:
+            spelling.append(f"{sym}")
+        elif self.array:
+            spelling.append(f"ctypes.Array(*{sym})")
+
+        return " ".join(spelling)
+
+
 
 class Pointer(Typespec):
     """Pointer"""

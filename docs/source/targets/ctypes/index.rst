@@ -18,9 +18,21 @@ What is produced:
   * Architecture check, which ensures that the target architecture matches the
     architecture, the bindings were built on.
 
-* Initialiser (``__init__.py``)
+* Initialisers (``__init__.py`` and ``lib/__init__.py``)
 
   * Necessary files for initialising the Python module.
+
+* C API Wrappers for each module (``lib/{submodule}.py``)
+
+  * Python module mapping the :ref:`sec-ir` to :class:`yace.target.ctypes`
+  * Entities are grouped in submodules by extracting the module name from the entity name.
+    It is assumed that entity names follow the format ``{meta.prefix}_{module}_{name}``.
+  * C typing is abstracted away, ensuring the interfaces of the modules are pythonic.
+  * :ref:`sec-ir-constants` become global variables in the ``{prefix}`` module,
+    such as ``{prefix}.MIN_X``.
+  * :ref:`Enum types<sec-ir-enumtypes>` mapped to :class:`yace.targets.ctypes.ctypes_sugar.Enum`
+  * :ref:`Struct types<sec-ir-structtypes>` mapped to :class:`yace.targets.ctypes.ctypes_sugar.Structure`
+  * :ref:`Union types<sec-ir-uniontypes>` mapped to :class:`yace.targets.ctypes.ctypes_sugar.Union`
 
 * ``raw`` API containing the full :ctypes:`ctypes <>` API.
 

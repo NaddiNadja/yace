@@ -1,4 +1,8 @@
+{% if isRaw -%}
 class {{ entity.sym }}(Structure):
+{%- else -%}
+class {{ entity.sym | map_sym }} (raw.{{ entity.sym }}):
+{%- endif %}
 {%- if entity.doc.__dict__.values()|map("length")|select|first %}
 	"""
 	{% for doc in [entity.doc.brief, entity.doc.description] if doc|length -%}
@@ -21,6 +25,7 @@ class {{ entity.sym }}(Structure):
 	"""
 {%- endif %}
 
+{% if isRaw %}
 	_pack_ = 1
 	_fields_ = [
 	{%- for member in entity.members %}
@@ -41,3 +46,7 @@ class {{ entity.sym }}(Structure):
 			raise ValueError("Invalid enum value")
 		self.{{ member.sym }} = value
 	{% endfor %}
+{%- else %}
+	_pack_ = 1
+	_fields_ = raw.{{ entity.sym }}._fields_
+{%- endif %}
