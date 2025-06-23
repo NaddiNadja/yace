@@ -5,8 +5,10 @@ ignores them, except for the special-case "c_char_p".
 """
 
 import copy
+import ctypes
 import logging as log
 import shutil
+import textwrap
 from pathlib import Path
 
 from yace.emitters import Emitter
@@ -14,6 +16,14 @@ from yace.errors import TransformationError
 from yace.targets.target import Target
 from yace.tools import Black, Isort, Python3
 from yace.transformations import Camelizer, DependencyWalker, Modulizer
+
+
+def wrap(text, indent="", width=72):
+    return "\n".join(textwrap.wrap(text, width=width, subsequent_indent=indent))
+
+
+def sizeof(ctypes_member: str):
+    return ctypes.sizeof(getattr(ctypes, ctypes_member))
 
 
 class Ctypes(Target):
@@ -105,30 +115,59 @@ class Ctypes(Target):
     def emit(self, model):
         """Emit code"""
 
+        filters = {
+            "wrap": wrap,
+            "sizeof": sizeof,
+        }
+
+        output = (self.output / model.meta.prefix).resolve()
+        output.mkdir(parents=True, exist_ok=True)
+
         # Copy the generic ctypes-sugar from resources
-        sugar_path = (self.output / "ctypes_sugar.py").resolve()
+        sugar_path = (output / "ctypes_sugar.py").resolve()
         shutil.copyfile(Path(__file__).parent / sugar_path.name, sugar_path)
         self.sources.append(sugar_path)
 
-        # Generate the bindings / Python API
-        files = [
-            ((self.output / f"{model.meta.prefix}.py").resolve(), "file_api"),
-            ((self.output / f"{model.meta.prefix}_check.py").resolve(), "file_check"),
-        ]
-        for path, template in files:
-            with path.open("w") as file:
-                file.write(
-                    self.emitter.render(
-                        template,
-                        {
-                            "meta": model.meta,
-                            "entities": model.entities,
-                            "headers": self.headers,
-                        },
-                        {},
-                    )
+        # Generate raw bindings in raw.py
+        def emit_typespec(typespec):
+            return typespec.python_c_spelling()
+
+        filters["emit_typespec"] = emit_typespec
+
+        raw_path = (output / "raw.py").resolve()
+        with raw_path.open("w") as file:
+            file.write(
+                self.emitter.render(
+                    "file_api",
+                    {
+                        "meta": model.meta,
+                        "entities": model.entities,
+                        "headers": self.headers,
+                    },
+                    filters,
                 )
-            self.sources.append(path)
+            )
+        self.sources.append(raw_path)
+
+        # Generate helper files
+        files = [
+            ((output / "util.py").resolve(), "util", {}),
+            (
+                (output / f"{model.meta.prefix}_check.py").resolve(),
+                "file_check",
+                {"meta": model.meta},
+            ),
+            (
+                (output / "__init__.py").resolve(),
+                "init",
+                {"meta": model.meta},
+            ),
+        ]
+
+        for path, template, args in files:
+            with path.open("w") as file:
+                file.write(self.emitter.render(template, args, filters))
+                self.sources.append(path)
 
     def format(self):
         """

@@ -1,0 +1,4 @@
+from .util import check_architecture, load
+
+check_architecture()
+clib = load("{{ meta.prefix }}")

@@ -1,0 +1,43 @@
+class {{ entity.sym }}(Structure):
+{%- if entity.doc.__dict__.values()|map("length")|select|first %}
+	"""
+	{% for doc in [entity.doc.brief, entity.doc.description] if doc|length -%}
+	{{ doc | wrap("	") }}
+	{% if not loop.last %}
+	{% endif %}
+	{%- endfor -%}
+
+	{%- for tag in entity.doc.tags if tag not in entity.key -%}
+	{% if loop.first and [entity.doc.brief, entity.doc.description]|reject("==","")|list|length %}
+	{# A whitespace between description and tags #}
+	{%- endif -%}
+	{{ tag }}: 
+	{%- for key in entity.doc.tags[tag] %}
+	  {{ key }} {{ entity.doc.tags[tag][key] }}
+	{% endfor -%}
+	{% if not loop.last %}
+	{% endif %}
+	{%- endfor -%}
+	"""
+{%- endif %}
+
+	_pack_ = 1
+	_fields_ = [
+	{%- for member in entity.members %}
+		{% if member.key in ["field", "field_decl"] -%}
+		("{{ member.sym }}", {{ "ctypes.c_int" if member.typ.enum else member.typ | emit_typespec }}),
+		{%- endif %}
+	{%- endfor %}
+	]
+
+	{% for member in entity.members if member.typ.enum %}
+	@property
+	def {{ member.sym }}(self) -> {{ member.typ | emit_typespec }}:
+			return {{ member.typ | emit_typespec }}(self.{{ member.sym }})
+
+	@{{ member.sym }}.setter
+	def {{ member.sym }}(self, value: {{ member.typ | emit_typespec }}):
+		if not isinstance(value, {{ member.typ | emit_typespec }}):
+			raise ValueError("Invalid enum value")
+		self.{{ member.sym }} = value
+	{% endfor %}

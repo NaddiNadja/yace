@@ -1,0 +1,8 @@
+{% if entity.doc.brief %}
+# {{ entity.doc.brief }}
+{%- endif %}
+{{ entity.sym }} = ctypes.CFUNCTYPE({{ entity.ret | emit_typespec }}, 
+{%- for param in entity.parameters -%}
+	{{- "ctypes.c_int" if param.typ.enum else param.typ | emit_typespec }}{{ "" if loop.last else ", " }}
+{%- endfor -%}
+) 
